@@ -310,7 +310,7 @@ const player=new THREEr.Group();          // the "walking" rig; camera lives ins
 player.position.set(0,1.55,5.4);
 player.add(camera);
 scene.add(player);
-let yaw=Math.PI, pitch=-0.05;              // desktop look angles
+let yaw=0, pitch=-0.05;                    // face the patch bay (negative z)
 
 /* ------------- CAMERA MODES: walk (FPS) vs drone (orbit-in-space) ------------- */
 const CAM={ mode:"walk", zoom:8.5, dyaw:Math.PI, dpitch:0.35, dtarget:new THREEr.Vector3(0,1.3,-1) };
