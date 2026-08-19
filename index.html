@@ -1,0 +1,1771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Kinetic Patch-Bay — Immersive Spatial Matrix</title>
+<style>
+  :root{
+    --bg:#0a0e12; --panel:#0f151b; --panel2:#141d25;
+    --line:#1e2b35; --line2:#2a3b48;
+    --audio:#3dffa0; --cv:#ffb020; --cable:#ff4d9d; --cyan:#35d0e6;
+    --ink:#dbe7ee; --dim:#7c8a95; --dimmer:#54636e;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+    font-family:var(--mono);overflow:hidden;-webkit-user-select:none;user-select:none;}
+  #scene{position:fixed;inset:0;display:block;touch-action:none;cursor:grab}
+  #scene.patching{cursor:crosshair}
+  #scene:active{cursor:grabbing}
+
+  /* ---- HUD ---- */
+  .hud{position:fixed;pointer-events:none;z-index:5}
+  .panel{background:linear-gradient(180deg,rgba(20,29,37,.92),rgba(12,17,22,.92));
+    border:1px solid var(--line2);border-radius:2px;pointer-events:auto;
+    backdrop-filter:blur(6px);box-shadow:0 8px 40px rgba(0,0,0,.5)}
+
+  /* top-left title */
+  #brand{top:14px;left:14px;max-width:290px}
+  #brand .panel{padding:12px 14px}
+  #brand h1{margin:0;font-size:13px;letter-spacing:.34em;font-weight:700;
+    text-transform:uppercase;color:var(--ink)}
+  #brand h1 b{color:var(--audio);font-weight:700}
+  #brand .sub{margin-top:5px;font-size:10px;letter-spacing:.18em;color:var(--dim);
+    text-transform:uppercase}
+  #brand .rule{height:1px;background:linear-gradient(90deg,var(--cable),transparent);
+    margin:9px 0 8px}
+  #brand .keys{font-size:10.5px;line-height:1.85;color:var(--dim)}
+  #brand .keys kbd{display:inline-block;min-width:15px;text-align:center;
+    padding:1px 5px;border:1px solid var(--line2);border-bottom-width:2px;border-radius:3px;
+    background:#0b1116;color:var(--ink);font-size:10px;font-family:var(--mono)}
+  #brand .keys .c{color:var(--dimmer)}
+
+  /* top-right readouts */
+  #readout{top:14px;right:14px;width:214px}
+  #readout .panel{padding:11px 13px}
+  #readout .r{display:flex;justify-content:space-between;align-items:baseline;
+    font-size:10.5px;padding:3px 0;letter-spacing:.06em}
+  #readout .r span:first-child{color:var(--dim);text-transform:uppercase;letter-spacing:.14em;font-size:9.5px}
+  #readout .r span:last-child{color:var(--ink);font-variant-numeric:tabular-nums}
+  #readout .r .g{color:var(--audio)} #readout .r .a{color:var(--cv)} #readout .r .m{color:var(--cable)}
+  #readout .bar{height:3px;background:#0b1116;border-radius:2px;margin-top:2px;overflow:hidden}
+  #readout .bar i{display:block;height:100%;background:var(--audio);width:0%}
+  #readout .divi{height:1px;background:var(--line);margin:8px 0}
+
+  /* module inspector — right column, appears when a module is selected */
+  #inspector{top:250px;right:14px;width:214px;display:none}
+  #inspector.on{display:block}
+  #inspector .panel{padding:12px 13px}
+  #inspector h3{margin:0 0 3px;font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--ink);font-weight:700}
+  #inspector .kind{font-size:9.5px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase;margin-bottom:10px}
+  #inspector .divi{height:1px;background:var(--line);margin:9px 0 8px}
+  #inspector .row{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}
+  #inspector .row label{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);display:flex;justify-content:space-between}
+  #inspector .row label b{color:var(--ink);font-weight:400;font-variant-numeric:tabular-nums}
+  #inspector .row .segbtn{display:flex;gap:4px}
+  #inspector .row .segbtn button{flex:1;font-family:var(--mono);font-size:9px;letter-spacing:.08em;
+    padding:5px 4px;border:1px solid var(--line2);background:#0b1116;color:var(--dim);cursor:pointer;border-radius:2px;text-transform:uppercase}
+  #inspector .row .segbtn button.on{border-color:var(--audio);color:var(--audio)}
+  #inspector .pin{font-size:9.5px;letter-spacing:.14em;color:var(--dim);margin-top:4px}
+  #inspector .pin a{color:var(--cyan);cursor:pointer;text-decoration:none;pointer-events:auto}
+
+  /* bottom controls */
+  #controls{bottom:14px;left:50%;transform:translateX(-50%);width:min(680px,calc(100vw - 28px))}
+  #controls .panel{padding:12px 16px;display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px 20px;align-items:center}
+  .ctl{display:flex;flex-direction:column;gap:5px}
+  .ctl label{font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);
+    display:flex;justify-content:space-between}
+  .ctl label b{color:var(--ink);font-weight:400;font-variant-numeric:tabular-nums}
+  input[type=range]{-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;
+    background:var(--line2);outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;
+    background:var(--ink);border:2px solid var(--cyan);cursor:grab}
+  input[type=range]::-moz-range-thumb{width:11px;height:11px;border-radius:50%;background:var(--ink);border:2px solid var(--cyan);cursor:grab}
+  #controls .rr input[type=range]::-webkit-slider-thumb{border-color:var(--cable)}
+  #controls .mv input[type=range]::-webkit-slider-thumb{border-color:var(--audio)}
+  .btn{pointer-events:auto;font-family:var(--mono);font-size:10px;letter-spacing:.16em;
+    text-transform:uppercase;padding:9px 13px;border-radius:3px;border:1px solid var(--line2);
+    background:#0b1116;color:var(--ink);cursor:pointer;transition:.12s}
+  .btn:hover{border-color:var(--cyan);color:var(--cyan)}
+  .btn.on{border-color:var(--audio);color:var(--audio)}
+  .btnrow{display:flex;gap:7px;flex-direction:column}
+
+  /* start overlay */
+  #gate{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 50% 40%,#0d141b,#06090c 70%)}
+  #gate .card{text-align:center;max-width:440px;padding:0 24px}
+  #gate .eyebrow{font-size:10px;letter-spacing:.4em;color:var(--cable);text-transform:uppercase;margin-bottom:18px}
+  #gate h2{font-size:29px;letter-spacing:.06em;margin:0 0 4px;font-weight:700;line-height:1.15}
+  #gate h2 em{font-style:normal;color:var(--audio)}
+  #gate p{color:var(--dim);font-size:12px;line-height:1.7;margin:16px auto 26px;max-width:380px}
+  #gate .enter{font-size:12px;letter-spacing:.22em;padding:15px 34px;border-color:var(--audio);color:var(--audio)}
+  #gate .enter:hover{background:var(--audio);color:#04140b}
+  #gate .note{margin-top:18px;font-size:10px;color:var(--dimmer);letter-spacing:.1em}
+  #xrbtn{margin-top:10px}
+
+  #toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%);z-index:8;
+    font-size:10.5px;letter-spacing:.1em;color:var(--cyan);background:rgba(8,12,16,.9);
+    border:1px solid var(--line2);border-radius:3px;padding:7px 14px;opacity:0;transition:.3s;pointer-events:none}
+  #toast.show{opacity:1}
+
+  @media (max-width:640px){
+    #brand{max-width:200px} #readout{width:150px}
+    #controls .panel{grid-template-columns:1fr 1fr;gap:10px}
+    #brand .keys{display:none}
+  }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<div id="brand" class="hud"><div class="panel">
+  <h1>Kinetic <b>Patch-Bay</b></h1>
+  <div class="sub">Immersive Spatial Matrix</div>
+  <div class="rule"></div>
+  <div class="keys">
+    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <span class="c">walk · proximity mod</span><br>
+    <kbd>Q</kbd><kbd>E</kbd> <span class="c">descend · rise</span><br>
+    <kbd>3</kbd> <span class="c">toggle drone camera</span><br>
+    <span class="c">wheel —</span> zoom<br>
+    <kbd>O</kbd> <span class="c">drop a floating orb</span><br>
+    <kbd>X</kbd> <span class="c">clear orbs</span><br>
+    <span class="c">drag port → port —</span> patch a cable<br>
+    <span class="c">drag a module body —</span> reposition node<br>
+    <span class="c">drag OSC·2 toward OSC·1 —</span> raise FM<br>
+    <kbd>Space</kbd> <span class="c">or walk into the gate —</span> strike<br>
+    <span class="c">click a module —</span> open inspector<br>
+    <span class="c">click a cable —</span> cut it
+  </div>
+</div></div>
+
+<div id="readout" class="hud"><div class="panel">
+  <div class="r"><span>Patches</span><span id="rPatch" class="m">0</span></div>
+  <div class="r"><span>Voices (HRTF)</span><span id="rVoice" class="g">0</span></div>
+  <div class="divi"></div>
+  <div class="r"><span>Room ø</span><span id="rRoom">—</span></div>
+  <div class="r"><span>Reverb blend</span><span id="rBlend" class="a">—</span></div>
+  <div class="divi"></div>
+  <div class="r"><span>FM index</span><span id="rFM" class="a">—</span></div>
+  <div class="bar"><i id="barFM" style="background:var(--cyan)"></i></div>
+  <div class="r"><span>Fold depth</span><span id="rPB" class="g">0.00</span></div>
+  <div class="bar"><i id="barPB"></i></div>
+  <div class="r"><span>Gate ring</span><span id="rPF" class="m">0.00</span></div>
+  <div class="bar"><i id="barPF" style="background:var(--cable)"></i></div>
+  <div class="divi"></div>
+  <div class="r"><span>Camera</span><span id="rCam" class="a">Walk</span></div>
+  <div class="r"><span>Orbs</span><span id="rOrb" class="g">0</span></div>
+  <div class="divi"></div>
+  <div class="r"><span>Frame</span><span id="rFps" class="dim">—</span></div>
+</div></div>
+
+<div id="inspector" class="hud"><div class="panel">
+  <h3 id="iName">—</h3>
+  <div class="kind" id="iKind">module</div>
+  <div class="divi"></div>
+  <div id="iBody"></div>
+  <div class="pin"><a id="iClose">✕ close</a> · <span class="c" style="color:var(--dimmer)">click a module</span></div>
+</div></div>
+<div id="controls" class="hud"><div class="panel">
+  <div class="ctl mv"><label>Master <b id="vMaster">70%</b></label>
+    <input id="master" type="range" min="0" max="100" value="70"></div>
+  <div class="ctl rr"><label>Room bounds <b id="vRoom">10.0 m</b></label>
+    <input id="room" type="range" min="0" max="100" value="34"></div>
+  <div class="ctl rr"><label>Reverb mix <b id="vWet">28%</b></label>
+    <input id="wet" type="range" min="0" max="100" value="28"></div>
+  <div class="btnrow">
+    <button id="proxBtn" class="btn on">Proximity: On</button>
+    <button id="resetBtn" class="btn">Reset patch</button>
+  </div>
+</div></div>
+
+<div id="toast"></div>
+
+<div id="gate">
+  <div class="card">
+    <div class="eyebrow">WebXR · West-Coast Spatial Voice</div>
+    <h2>Step inside your <em>synthesizer</em></h2>
+    <p>A Buchla-style voice floats in the room: two oscillators cross-modulate into a wavefolder and a low-pass gate. Draw cables to reroute it, drag OSC·2 toward OSC·1 to drive the FM, and strike the gate with a keystroke — or by walking into it. Headphones recommended for HRTF spatial audio.</p>
+    <button id="enterBtn" class="btn enter">Enter the Patch-Bay</button>
+    <div><button id="xrbtn" class="btn" style="display:none">Enter VR</button></div>
+    <div class="note" id="gateNote">Audio starts on entry · desktop-playable, no headset required</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script id="app">
+"use strict";
+/* =========================================================================
+   KINETIC PATCH-BAY — prototype
+   Three.js (visual) + native Web Audio (sound), decoupled per the blueprint:
+     - useFrame-equivalent render loop: ONLY visual transforms + proximity CV
+     - audio graph mutates ONLY on patch add/remove (edge diff, never rebuild-all)
+   Spatialization model (documented choice):
+     audio cables carry mono pre-spatial signal; an HRTF PannerNode is created
+     at the SOURCE module for each cable that reaches OUTPUT.in, so sound
+     emanates from wherever the signal physically arrives at the output.
+   ========================================================================= */
+
+const THREEr = THREE;
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const lerp=(a,b,t)=>a+(b-a)*t;
+
+/* ---------------------------------------------------------------- AUDIO */
+const AudioEngine = (()=> {
+  let ctx=null, master, dry, wetA, wetB, wetSum, wetGain, convA, convB, limiter;
+  let started=false;
+
+  function impulse(seconds, decay, color){
+    const rate=ctx.sampleRate, len=Math.floor(rate*seconds);
+    const buf=ctx.createBuffer(2,len,rate);
+    for(let ch=0;ch<2;ch++){
+      const d=buf.getChannelData(ch);
+      let last=0;
+      for(let i=0;i<len;i++){
+        const env=Math.pow(1-i/len, decay);
+        let n=(Math.random()*2-1)*env;
+        // gentle low-pass for larger/darker spaces
+        last = last + color*(n-last); d[i]=last;
+      }
+    }
+    return buf;
+  }
+
+  function init(){
+    if(ctx) return ctx;
+    ctx = new (window.AudioContext||window.webkitAudioContext)();
+    master = ctx.createGain(); master.gain.value=0.7;
+    dry    = ctx.createGain(); dry.gain.value=1.0;
+    wetGain= ctx.createGain(); wetGain.gain.value=0.28;
+    wetSum = ctx.createGain();
+    convA  = ctx.createConvolver(); convA.buffer = impulse(0.5, 6.0, 0.95); // tight room
+    convB  = ctx.createConvolver(); convB.buffer = impulse(3.6, 2.6, 0.30); // large hall
+    wetA   = ctx.createGain(); wetB = ctx.createGain();
+    limiter= ctx.createDynamicsCompressor();
+    limiter.threshold.value=-6; limiter.knee.value=6; limiter.ratio.value=12;
+    limiter.attack.value=0.003; limiter.release.value=0.18;
+    // master bus -> dry + two parallel convolvers (equal-power crossfaded) -> limiter -> out
+    master.connect(dry).connect(limiter);
+    master.connect(convA).connect(wetA).connect(wetSum);
+    master.connect(convB).connect(wetB).connect(wetSum);
+    wetSum.connect(wetGain).connect(limiter);
+    limiter.connect(ctx.destination);
+    setRoom(0.34);
+    return ctx;
+  }
+  function resume(){ if(ctx&&ctx.state!=="running") ctx.resume(); started=true; }
+  function busIn(){ return master; }
+
+  // equal-power crossfade between the two IRs from a 0..1 size value
+  function setRoom(t){
+    if(!ctx) return;
+    const now=ctx.currentTime;
+    wetA.gain.setTargetAtTime(Math.cos(t*Math.PI/2), now, 0.05);
+    wetB.gain.setTargetAtTime(Math.sin(t*Math.PI/2), now, 0.05);
+  }
+  function setMaster(v){ if(master) master.gain.setTargetAtTime(v,ctx.currentTime,0.03); }
+  function setWet(v){ if(wetGain) wetGain.gain.setTargetAtTime(v,ctx.currentTime,0.03); }
+
+  // listener follows the (world) camera each frame
+  const _fwd=new THREEr.Vector3(), _up=new THREEr.Vector3();
+  function setListener(pos, quat){
+    if(!ctx) return; const L=ctx.listener;
+    _fwd.set(0,0,-1).applyQuaternion(quat);
+    _up.set(0,1,0).applyQuaternion(quat);
+    if(L.positionX){
+      const t=ctx.currentTime, k=0.02;
+      L.positionX.setTargetAtTime(pos.x,t,k);
+      L.positionY.setTargetAtTime(pos.y,t,k);
+      L.positionZ.setTargetAtTime(pos.z,t,k);
+      L.forwardX.setTargetAtTime(_fwd.x,t,k); L.forwardY.setTargetAtTime(_fwd.y,t,k); L.forwardZ.setTargetAtTime(_fwd.z,t,k);
+      L.upX.setTargetAtTime(_up.x,t,k); L.upY.setTargetAtTime(_up.y,t,k); L.upZ.setTargetAtTime(_up.z,t,k);
+    } else { // deprecated fallback (older Safari)
+      L.setPosition(pos.x,pos.y,pos.z);
+      L.setOrientation(_fwd.x,_fwd.y,_fwd.z,_up.x,_up.y,_up.z);
+    }
+  }
+  function makePanner(){
+    const p=ctx.createPanner();
+    p.panningModel="HRTF"; p.distanceModel="inverse";
+    p.refDistance=1.4; p.maxDistance=40; p.rolloffFactor=0.7;
+    return p;
+  }
+  return {init,resume,ctx:()=>ctx,busIn,setRoom,setMaster,setWet,setListener,makePanner};
+})();
+
+/* --------------------------------------------------- SCENE / RENDERER */
+const canvas=document.getElementById("scene");
+const renderer=new THREEr.WebGLRenderer({canvas,antialias:true,alpha:false});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.outputEncoding=THREEr.sRGBEncoding;
+renderer.xr.enabled=true;
+
+const scene=new THREEr.Scene();
+scene.background=new THREEr.Color(0x070a0d);
+scene.fog=new THREEr.FogExp2(0x070a0d,0.028);
+
+const camera=new THREEr.PerspectiveCamera(66,innerWidth/innerHeight,0.05,200);
+const player=new THREEr.Group();          // the "walking" rig; camera lives inside
+player.position.set(0,1.55,5.4);
+player.add(camera);
+scene.add(player);
+let yaw=Math.PI, pitch=-0.05;              // desktop look angles
+
+/* ------------- CAMERA MODES: walk (FPS) vs drone (orbit-in-space) ------------- */
+const CAM={ mode:"walk", zoom:8.5, dyaw:Math.PI, dpitch:0.35, dtarget:new THREEr.Vector3(0,1.3,-1) };
+function setCameraMode(m){
+  CAM.mode=m; el("rCam").textContent = m==="walk"?"Walk":"Drone";
+  if(m==="drone"){
+    // start the drone hovering over the current walk position, looking at the patch
+    CAM.dtarget.copy(player.position); CAM.dtarget.y = 1.3;
+    CAM.dyaw=yaw; CAM.dpitch=0.35; CAM.zoom=8.5;
+    toast("Drone camera · WASD glide · wheel zoom");
+  } else { toast("Walk camera"); }
+}
+
+// lights
+scene.add(new THREEr.AmbientLight(0x2a3644,0.9));
+const key=new THREEr.PointLight(0x9fe8ff,0.5,40); key.position.set(4,7,4); scene.add(key);
+const fill=new THREEr.PointLight(0xff5da0,0.35,40); fill.position.set(-6,4,-3); scene.add(fill);
+
+// floor grid + room bounds
+const grid=new THREEr.GridHelper(40,40,0x203040,0x121c25);
+grid.material.transparent=true; grid.material.opacity=0.5; scene.add(grid);
+const roomEdges=new THREEr.LineSegments(
+  new THREEr.EdgesGeometry(new THREEr.BoxGeometry(1,1,1)),
+  new THREEr.LineBasicMaterial({color:0x2b6b7a,transparent:true,opacity:0.55}));
+scene.add(roomEdges);
+
+/* label sprites via canvas texture */
+function label(text,color){
+  const c=document.createElement("canvas"); c.width=256; c.height=64;
+  const g=c.getContext("2d");
+  g.fillStyle="rgba(8,12,16,0.0)"; g.fillRect(0,0,256,64);
+  g.font="600 30px ui-monospace,Menlo,monospace";
+  g.textAlign="center"; g.textBaseline="middle";
+  g.fillStyle=color; g.fillText(text,128,34);
+  const tex=new THREEr.CanvasTexture(c); tex.anisotropy=4;
+  const s=new THREEr.Sprite(new THREEr.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));
+  s.scale.set(1.3,0.33,1); return s;
+}
+
+/* ------------------------------------------------------------ MODULES */
+/* Each module = a body mesh + labelled port spheres + audio nodes.
+   Ports: {id,kind:'out'|'in', sig:'audio'|'cv', label, node|param, mesh, offset} */
+const COL={audio:0x3dffa0, cv:0xffb020, cable:0xff4d9d, cyan:0x35d0e6,
+           osc:0x2fd6c4, lfo:0xffb020, filter:0xff4d9d, out:0xbfe8ff};
+const modules=[]; const portMeshes=[]; const bodyMeshes=[];
+let A;                    // audio ctx, set on start
+
+/* Ports have distinct visual identity:
+   - OUT jacks = solid sphere (the "plug"), stronger emissive
+   - IN jacks  = flat ring/torus (the "socket"), softer emissive
+   Both breathe slowly so ports read as interactive from a distance.
+   A separate ring child appears when the port has an active connection. */
+function portSphere(sig,kind){
+  const col = sig==='audio' ? COL.audio : COL.cv;
+  const grp = new THREEr.Group();
+  let core;
+  if(kind==='out'){
+    core = new THREEr.Mesh(
+      new THREEr.SphereGeometry(0.058,16,12),
+      new THREEr.MeshStandardMaterial({
+        color:col, emissive:col, emissiveIntensity:0.8,
+        roughness:0.35, metalness:0.15}));
+  } else {
+    core = new THREEr.Mesh(
+      new THREEr.TorusGeometry(0.055,0.018,8,20),
+      new THREEr.MeshStandardMaterial({
+        color:col, emissive:col, emissiveIntensity:0.35,
+        roughness:0.5, metalness:0.1}));
+    // orient the torus so it faces outward from the module body
+  }
+  grp.add(core);
+  // hit target — an invisible slightly-larger sphere so both shapes have identical picking
+  const hit = new THREEr.Mesh(
+    new THREEr.SphereGeometry(0.09,10,8),
+    new THREEr.MeshBasicMaterial({visible:false, depthWrite:false}));
+  grp.add(hit);
+  // connection ring — hidden unless the port is patched
+  const ring = new THREEr.Mesh(
+    new THREEr.TorusGeometry(0.11,0.008,6,20),
+    new THREEr.MeshBasicMaterial({color:col,transparent:true,opacity:0}));
+  ring.rotation.x=Math.PI*0.5;
+  grp.add(ring);
+  // guide dot — a small sphere that pulses on compatible targets during a patch
+  const guide = new THREEr.Mesh(
+    new THREEr.SphereGeometry(0.16,10,8),
+    new THREEr.MeshBasicMaterial({color:col,transparent:true,opacity:0,depthWrite:false}));
+  grp.add(guide);
+  // store references directly on the group for later mutation
+  grp.userData.core=core;
+  grp.userData.ring=ring;
+  grp.userData.guide=guide;
+  grp.userData.hit=hit;
+  grp.userData.baseIntensity=(kind==='out')?0.8:0.35;
+  grp.userData.baseColor=col;
+  grp.userData.sig=sig;
+  grp.userData.kind=kind;
+  return grp;
+}
+
+function makeModule(def){
+  const grp=new THREEr.Group(); grp.position.copy(def.pos);
+  const bodyGeo = def.geo || new THREEr.BoxGeometry(0.62,0.62,0.62);
+  const body=new THREEr.Mesh(bodyGeo, new THREEr.MeshStandardMaterial({
+    color:def.color, emissive:def.color, emissiveIntensity:0.32,
+    roughness:0.35, metalness:0.25, flatShading:true}));
+  body.userData={module:null,body:true}; grp.add(body); bodyMeshes.push(body);
+  const halo=new THREEr.Mesh(new THREEr.SphereGeometry(0.62,20,16),
+    new THREEr.MeshBasicMaterial({color:def.color,transparent:true,opacity:0.05}));
+  grp.add(halo);
+  const lab=label(def.name, "#"+def.color.toString(16).padStart(6,"0")); lab.position.y=0.62; grp.add(lab);
+  scene.add(grp);
+
+  const mod={id:def.id,name:def.name,type:def.type,color:def.color,group:grp,body,halo,
+             ports:[], audio:null, dirty:true,
+             prox:def.prox||null, proxVal:0};
+  body.userData.module=mod;
+
+  // lay ports around the body
+  def.ports.forEach((p,i)=>{
+    const portGroup=portSphere(p.sig,p.kind);
+    portGroup.position.copy(p.offset);
+    portGroup.userData.module=mod;    // keep, so pointer-hover-on-group still resolves
+    grp.add(portGroup);
+    const plab=label(p.label, p.sig==='audio'?"#3dffa0":"#ffb020");
+    plab.scale.set(0.62,0.16,1); plab.position.copy(p.offset).multiplyScalar(1.42); plab.position.y+=0.02;
+    grp.add(plab);
+    const port={id:mod.id+":"+p.id, pid:p.id, kind:p.kind, sig:p.sig, label:p.label,
+                mesh:portGroup, offset:p.offset.clone(), module:mod,
+                node:null, param:null, paramBase:0, cvDepth:p.cvDepth||1,
+                connected:0, pulsePhase:Math.random()*Math.PI*2};
+    // wire pickability to the invisible hit sphere
+    portGroup.userData.hit.userData.port=port;
+    portGroup.userData.port=port;   // convenience for other paths
+    mod.ports.push(port);
+    portMeshes.push(portGroup.userData.hit);
+  });
+  modules.push(mod);
+  return mod;
+}
+
+function findPort(mod,pid){ return mod.ports.find(p=>p.pid===pid); }
+
+/* wavefolder transfer curve: several sine folds across [-1,1].
+   Harder drive pushes the signal across more folds → more harmonics (West Coast
+   ADD-itive timbre, vs East-Coast subtractive filtering). */
+const FOLD_CURVE=(()=>{ const n=4096,c=new Float32Array(n),FOLDS=4.2;
+  for(let i=0;i<n;i++){ const x=(i/(n-1))*2-1; c[i]=Math.sin(x*Math.PI*FOLDS)*0.86; }
+  return c; })();
+
+/* Oscillator waveshaper curve — turns a pure sine into something closer to a
+   saturated saw/pulse-hybrid. Mixed with the raw sine via a CV-controllable gain
+   so "waveshape" is itself a modulatable parameter. */
+const OSC_SHAPE_CURVE=(()=>{ const n=4096,c=new Float32Array(n);
+  for(let i=0;i<n;i++){ const x=(i/(n-1))*2-1;
+    // asymmetric tanh + a squared term = odd + even harmonics; sits between saw and pulse
+    c[i]=Math.tanh(x*2.4) - 0.25*Math.sign(x)*x*x;
+  } return c; })();
+
+/* Slope-shaping curve for the function generator: turns a sawtooth ramp into a
+   variable rise/fall shape via a monotonic mapping we can retune at runtime. */
+const SKEW_CURVE_INIT=(()=>{ const n=1024,c=new Float32Array(n);
+  for(let i=0;i<n;i++){ const x=(i/(n-1))*2-1; c[i]=Math.sign(x)*Math.pow(Math.abs(x),0.7); }
+  return c; })();
+function makeSkewCurve(skew){
+  // skew 0..1 → 0 = sharp attack + slow decay (percussive), 1 = slow attack + sharp decay
+  // 0.5 ≈ symmetric triangle
+  const n=1024,c=new Float32Array(n);
+  const a=Math.pow(2, (skew-0.5)*3);   // 0.5→1, 0→~0.35 (concave), 1→~2.8 (convex)
+  for(let i=0;i<n;i++){
+    const t=i/(n-1);                       // sawtooth phase 0..1
+    // remap saw into an asymmetric triangle: rise for skew*period, fall for the rest
+    let y; const k=clamp(skew,0.02,0.98);
+    if(t<k) y = t/k;
+    else    y = 1 - (t-k)/(1-k);
+    // convex/concave contour
+    y = Math.pow(y, a);
+    c[i]=y*2-1;
+  }
+  return c;
+}
+
+/* build the audio nodes for a module once the context exists */
+function wireModuleAudio(mod){
+  const c=A;
+  if(mod.type==="osc"){
+    // Rich oscillator: base sine + optional second harmonic + waveshape via periodic wave.
+    // Every OSC gets: pitch input, level input, waveshape input (blends sine→saw→square-ish),
+    // and (primary only) a sub-harmonic mix for weight.
+    const primary=(mod.id==="oscA");
+    const osc=c.createOscillator(); osc.type="sine";
+    osc.frequency.value = primary?110:165;
+
+    // waveshaper implementing a variable-blend curve driven by CV.
+    // The curve is precomputed; a following gain controls the *mix* between raw sine
+    // (bypass) and the shaped output — this way "wave" can be modulated at CV rate.
+    const shaper=c.createWaveShaper(); shaper.curve=OSC_SHAPE_CURVE; shaper.oversample="2x";
+    const raw=c.createGain();  raw.gain.value=1.0;      // sine bypass
+    const wet=c.createGain();  wet.gain.value=0.0;      // shaped mix (0..1 via CV)
+    const mix=c.createGain();  mix.gain.value=1.0;
+    osc.connect(raw); raw.connect(mix);
+    osc.connect(shaper); shaper.connect(wet); wet.connect(mix);
+
+    // sub oscillator (primary only): one octave down, blended in by a small gain
+    let sub=null, subGain=null;
+    if(primary){
+      sub=c.createOscillator(); sub.type="triangle"; sub.frequency.value=osc.frequency.value*0.5;
+      subGain=c.createGain(); subGain.gain.value=0.15;
+      sub.connect(subGain); subGain.connect(mix); sub.start();
+      // keep sub tracking primary pitch (sub freq is derived, so bind via a gain chain
+      // driven from a ConstantSource for base + FM taps go to the primary only)
+    }
+
+    const amp=c.createGain(); amp.gain.value=primary?0.9:0.5;
+    mix.connect(amp); osc.start();
+
+    mod.audio={osc,amp,shaper,raw,wet,mix,sub,subGain,tap:amp,base:osc.frequency.value};
+    findPort(mod,"out").node=amp;
+    const fm=findPort(mod,"fm"); if(fm){ fm.param=osc.frequency; fm.paramBase=osc.frequency.value; }
+    const lv=findPort(mod,"lvl"); if(lv){ lv.param=amp.gain; lv.paramBase=amp.gain.value; }
+    const wv=findPort(mod,"wave"); if(wv){ wv.param=wet.gain; wv.paramBase=0; }
+  }
+  else if(mod.type==="lfo"){
+    // Now a slope-shaped function generator that can self-cycle OR be triggered.
+    // Two ranges: audio-rate and LFO-rate, plus rise/fall skew and level output.
+    // Implemented with an oscillator + waveshaper for cheap slope shaping.
+    const osc=c.createOscillator(); osc.type="sawtooth"; osc.frequency.value=0.55;
+    const shaper=c.createWaveShaper(); shaper.curve=SKEW_CURVE_INIT; shaper.oversample="none";
+    const depth=c.createGain(); depth.gain.value=1.0;
+    osc.connect(shaper); shaper.connect(depth); osc.start();
+    mod.audio={osc,shaper,depth,tap:depth, skew:0.5};
+    findPort(mod,"out").node=depth;
+    const rt=findPort(mod,"rate"); if(rt){ rt.param=osc.frequency; rt.paramBase=osc.frequency.value; }
+  }
+  else if(mod.type==="fold"){
+    const inGain=c.createGain(); inGain.gain.value=1.0;
+    const drive=c.createGain(); drive.gain.value=0.55;   // holds a base value; baseCS ADDS
+    const offset=c.createConstantSource(); offset.offset.value=0.0; offset.start();
+    const shaper=c.createWaveShaper(); shaper.curve=FOLD_CURVE; shaper.oversample="4x";
+    const tap=c.createGain(); tap.gain.value=1.0;
+    inGain.connect(drive); drive.connect(shaper); offset.connect(shaper); shaper.connect(tap);
+    // baseCS: an ADDITIONAL bias into drive.gain, used by proximity/orbs so they don't
+    // stomp CV writes. Starts at 0 so the intrinsic 0.55 above is the effective base.
+    const baseCS=c.createConstantSource(); baseCS.offset.value=0.0; baseCS.start();
+    baseCS.connect(drive.gain);
+    mod.audio={inGain,drive,offset,shaper,tap,baseCS};
+    findPort(mod,"in").node=inGain;
+    findPort(mod,"out").node=tap;
+    const drv=findPort(mod,"drv"); if(drv){ drv.param=drive.gain; drv.paramBase=0.55; }
+    const sym=findPort(mod,"sym"); if(sym){ sym.param=offset.offset; sym.paramBase=0; }
+  }
+  else if(mod.type==="ring"){
+    // Ring mod: audio in × carrier in, via GainNode with a-rate control input.
+    // Native trick — connecting an audio-rate signal to gain.gain multiplies them.
+    const inGain=c.createGain(); inGain.gain.value=1.0;
+    const vca=c.createGain(); vca.gain.value=0.0;  // starts silent until a carrier arrives
+    const tap=c.createGain(); tap.gain.value=1.4;   // small make-up
+    inGain.connect(vca); vca.connect(tap);
+    mod.audio={inGain,vca,tap};
+    findPort(mod,"in").node=inGain;
+    findPort(mod,"out").node=tap;
+    // "carrier" input is a NODE input that writes to gain.gain — treat as a param-target
+    const car=findPort(mod,"car"); if(car){ car.param=vca.gain; car.paramBase=0; }
+  }
+  else if(mod.type==="lpg"){
+    const inGain=c.createGain();
+    const lpf=c.createBiquadFilter(); lpf.type="lowpass"; lpf.frequency.value=600; lpf.Q.value=2.2;
+    const vca=c.createGain(); vca.gain.value=0.4;   // DC-biased open by default
+    const tap=c.createGain(); tap.gain.value=1.0;
+    inGain.connect(lpf); lpf.connect(vca); vca.connect(tap);
+    // Rectified CV input — negative CV still opens the gate (like a real vactrol)
+    const cvIn=c.createGain(); cvIn.gain.value=1.0;
+    const rect=c.createWaveShaper();
+    {
+      const n=1024, cur=new Float32Array(n);
+      for(let i=0;i<n;i++){ const x=(i/(n-1))*2-1; cur[i]=Math.abs(x); }
+      rect.curve=cur;
+    }
+    const toVca=c.createGain(); toVca.gain.value=1.4;   // opens on top of 0.4 base
+    const toCut=c.createGain(); toCut.gain.value=6000;
+    cvIn.connect(rect); rect.connect(toVca); toVca.connect(vca.gain);
+    rect.connect(toCut); toCut.connect(lpf.frequency);
+    mod.audio={inGain,lpf,vca,tap,cvIn,decay:0.55};
+    findPort(mod,"in").node=inGain;
+    findPort(mod,"out").node=tap;
+    const cv=findPort(mod,"cv"); if(cv){ cv.node=cvIn; }
+  }
+  else if(mod.type==="sou"){
+    // BUCHLA 265 · SOURCE OF UNCERTAINTY
+    // Three outputs, all NON-PERIODIC:
+    //   * FLUX (smooth random) — band-limited noise → very-lowpass → soft random voltage
+    //   * STEP (sample-and-hold random) — quantized-in-time random voltage, clock-able
+    //   * NOISE (audio-rate) — white noise for FM-into-audio scenarios
+    // No triggers, no LFO. This is what stops the patch from sounding like a metronome.
+
+    // White noise buffer (2s, looped) — cheap, sounds right
+    const noiseBuf=c.createBuffer(1, c.sampleRate*2, c.sampleRate);
+    const nd=noiseBuf.getChannelData(0);
+    for(let i=0;i<nd.length;i++) nd[i]=(Math.random()*2-1);
+    const noise=c.createBufferSource(); noise.buffer=noiseBuf; noise.loop=true;
+    const noiseTap=c.createGain(); noiseTap.gain.value=0.35;
+    noise.connect(noiseTap); noise.start();
+
+    // FLUX: noise → aggressive lowpass → gain (smoothed random voltage)
+    const fluxLp=c.createBiquadFilter(); fluxLp.type="lowpass";
+    fluxLp.frequency.value=1.6; fluxLp.Q.value=0.5;   // sub-audio, sloshy
+    const fluxTap=c.createGain(); fluxTap.gain.value=2.5;   // smoothed noise → ~±0.4 CV
+    noise.connect(fluxLp); fluxLp.connect(fluxTap);
+
+    // STEP: sample-and-hold. Implemented in JS: on each internal clock, read a fresh
+    // random value and ramp a ConstantSource output to it (instant step).
+    const step=c.createConstantSource(); step.offset.value=0.0; step.start();
+    const stepTap=c.createGain(); stepTap.gain.value=1.0;
+    step.connect(stepTap);
+    mod.audio={noise,noiseTap,fluxLp,fluxTap,step,stepTap, rate:2.6, phase:0};
+    findPort(mod,"flux").node=fluxTap;
+    findPort(mod,"step").node=stepTap;
+    findPort(mod,"noise").node=noiseTap;
+    // rate CV target: writes to a JS-side clock speed (not an AudioParam)
+    // handled in the frame loop by reading mod.audio.rate
+  }
+  else if(mod.type==="clock"){
+    // Sub-audio pulse generator with a quantized-pitch CV output.
+    // Two outs: TRIG (fast up-pulse for pinging the gate), PITCH (stepped voltage
+    // quantized to a scale — feed to OSC FM for melodic sequences).
+    const trig=c.createConstantSource(); trig.offset.value=0.0; trig.start();
+    const trigTap=c.createGain(); trigTap.gain.value=1.0;
+    trig.connect(trigTap);
+    const pitch=c.createConstantSource(); pitch.offset.value=0.0; pitch.start();
+    const pitchTap=c.createGain(); pitchTap.gain.value=1.0;
+    pitch.connect(pitchTap);
+    mod.audio={trig,trigTap,pitch,pitchTap,
+      bpm:96, div:0.5, phase:0, stepIdx:0,
+      // C minor pentatonic in Hz deviation from a base ~110Hz — nice open West Coast
+      scale:[0, 24, 45, 62, 78, 100, 116, 145],
+      lastStep:-1};
+    findPort(mod,"trig").node=trigTap;
+    findPort(mod,"pitch").node=pitchTap;
+  }
+  else if(mod.type==="out"){
+    mod.audio={bus:AudioEngine.busIn()};
+    findPort(mod,"in").node=AudioEngine.busIn();
+  }
+}
+
+/* vactrol strike: fast attack, slow decay back to the DC bias (gate rests open) */
+function pluckLPG(mod,strength){
+  if(!mod||!mod.audio||!mod.audio.vca) return;
+  strength=strength==null?1:strength;
+  const t=A.currentTime, dk=mod.audio.decay;
+  const g=mod.audio.vca.gain, f=mod.audio.lpf.frequency;
+  const gBase=0.4, fBase=600;   // matches LPG defaults above
+  g.cancelScheduledValues(t); g.setValueAtTime(Math.max(g.value,gBase),t);
+  g.linearRampToValueAtTime(strength, t+0.004);
+  g.setTargetAtTime(gBase, t+0.004, dk*0.34);
+  f.cancelScheduledValues(t); f.setValueAtTime(f.value,t);
+  f.linearRampToValueAtTime(80+strength*6200, t+0.006);
+  f.setTargetAtTime(fBase, t+0.006, dk*0.34);
+  mod.body.material.emissiveIntensity=1.4;  // visual pop
+}
+
+/* -------------------------------------------------------- BUILD LAYOUT */
+const V=(x,y,z)=>new THREEr.Vector3(x,y,z);
+function buildModules(){
+  // OSC·1 — carrier. Now has a WAVE cv input (shape modulation) so timbre can move.
+  makeModule({id:"oscA",name:"OSC·1 PRIMARY",type:"osc",color:COL.osc,pos:V(-4.2,1.5,-1.0),
+    geo:new THREEr.IcosahedronGeometry(0.44,0), ports:[
+    {id:"out",kind:"out",sig:"audio",label:"OUT",offset:V(0.55,0,0)},
+    {id:"fm", kind:"in", sig:"cv",   label:"FM",  offset:V(-0.55,0.32,0),cvDepth:80},
+    {id:"lvl",kind:"in", sig:"cv",   label:"LVL", offset:V(-0.55,0,0),cvDepth:0.4},
+    {id:"wave",kind:"in",sig:"cv",   label:"WAVE",offset:V(-0.55,-0.32,0),cvDepth:0.6},
+  ]});
+  // OSC·2 — modulator. Also gets WAVE so FM'ing OSC 1 with an evolving timbre gets wild.
+  makeModule({id:"oscB",name:"OSC·2 MOD",type:"osc",color:COL.osc,pos:V(-2.1,2.15,-2.2),
+    geo:new THREEr.OctahedronGeometry(0.44,0), ports:[
+    {id:"out",kind:"out",sig:"audio",label:"OUT", offset:V(0.5,-0.2,0)},
+    {id:"fm", kind:"in", sig:"cv",   label:"FM",  offset:V(-0.5,0.32,0),cvDepth:60},
+    {id:"wave",kind:"in",sig:"cv",   label:"WAVE",offset:V(-0.5,-0.32,0),cvDepth:0.6},
+  ]});
+  // SOURCE OF UNCERTAINTY — Buchla 265. Three non-periodic outputs.
+  makeModule({id:"sou",name:"UNCERTAINTY",type:"sou",color:0xa080ff,pos:V(-3.2,2.9,-3.6),
+    geo:new THREEr.SphereGeometry(0.44,10,8), ports:[
+    {id:"flux", kind:"out",sig:"cv",   label:"FLUX", offset:V(0.55,0.2,0)},
+    {id:"step", kind:"out",sig:"cv",   label:"STEP", offset:V(0.55,-0.2,0)},
+    {id:"noise",kind:"out",sig:"audio",label:"NOISE",offset:V(-0.55,0,0)},
+  ]});
+  // FUNCTION GENERATOR (formerly LFO) — slope-shaped, self-cycling, has a rate CV in.
+  makeModule({id:"lfo",name:"FUNCTION GEN",type:"lfo",color:COL.lfo,pos:V(-0.4,2.7,-3.6),
+    geo:new THREEr.TetrahedronGeometry(0.48,0), ports:[
+    {id:"out", kind:"out",sig:"cv",label:"OUT", offset:V(0,-0.55,0)},
+    {id:"rate",kind:"in", sig:"cv",label:"RATE",offset:V(0,0.55,0),cvDepth:8},
+  ]});
+  // PULSE / SEQ — quantized pitch + trigger. Only USE when you want rhythm.
+  makeModule({id:"clock",name:"PULSE + SEQ",type:"clock",color:0xffd070,pos:V(1.8,2.85,-3.4),
+    geo:new THREEr.ConeGeometry(0.42,0.7,5), ports:[
+    {id:"trig", kind:"out",sig:"cv",label:"TRIG", offset:V(-0.5,0,0)},
+    {id:"pitch",kind:"out",sig:"cv",label:"PITCH",offset:V(0.5,0,0)},
+  ]});
+  // WAVEFOLDER — still the timbre engine
+  makeModule({id:"fold",name:"WAVEFOLDER",type:"fold",color:COL.cyan,pos:V(-1.2,1.25,-0.9),
+    geo:new THREEr.TorusGeometry(0.34,0.15,10,20),
+    prox:{target:"drive"}, ports:[
+    {id:"in", kind:"in", sig:"audio",label:"IN", offset:V(-0.6,0,0)},
+    {id:"out",kind:"out",sig:"audio",label:"OUT",offset:V(0.6,0,0)},
+    {id:"drv",kind:"in", sig:"cv",   label:"FOLD",offset:V(0,0.55,0),cvDepth:0.45},
+    {id:"sym",kind:"in", sig:"cv",   label:"SYM", offset:V(0,-0.55,0),cvDepth:0.5},
+  ]});
+  // FOLDER·2 — a second, hotter folder for cascade timbres. Optional in the graph.
+  makeModule({id:"fold2",name:"WAVEFOLDER·2",type:"fold",color:0x60c0d0,pos:V(0.6,1.55,-0.4),
+    geo:new THREEr.TorusGeometry(0.30,0.12,10,20), ports:[
+    {id:"in", kind:"in", sig:"audio",label:"IN", offset:V(-0.55,0,0)},
+    {id:"out",kind:"out",sig:"audio",label:"OUT",offset:V(0.55,0,0)},
+    {id:"drv",kind:"in", sig:"cv",   label:"FOLD",offset:V(0,0.5,0),cvDepth:0.55},
+    {id:"sym",kind:"in", sig:"cv",   label:"SYM", offset:V(0,-0.5,0),cvDepth:0.5},
+  ]});
+  // RING MOD — carrier × signal. Great with the two oscillators or with noise.
+  makeModule({id:"ring",name:"RING MOD",type:"ring",color:0xff80c0,pos:V(2.1,1.75,-1.2),
+    geo:new THREEr.OctahedronGeometry(0.36,0), ports:[
+    {id:"in", kind:"in", sig:"audio",label:"IN",  offset:V(-0.55,0,0)},
+    {id:"out",kind:"out",sig:"audio",label:"OUT", offset:V(0.55,0,0)},
+    {id:"car",kind:"in", sig:"cv",   label:"CAR", offset:V(0,0.55,0),cvDepth:1.0},
+  ]});
+  // LOW-PASS GATE — final voice-shaper
+  makeModule({id:"lpg",name:"LOW-PASS GATE",type:"lpg",color:COL.filter,pos:V(2.4,1.05,0.4),
+    geo:new THREEr.DodecahedronGeometry(0.42,0),
+    prox:{target:"decay"}, ports:[
+    {id:"in", kind:"in", sig:"audio",label:"IN", offset:V(-0.6,0,0)},
+    {id:"out",kind:"out",sig:"audio",label:"OUT",offset:V(0.6,0,0)},
+    {id:"cv", kind:"in", sig:"cv",   label:"PING",offset:V(0,0.6,0)},
+  ]});
+  // OUTPUT
+  makeModule({id:"out",name:"OUTPUT",type:"out",color:COL.out,pos:V(3.6,0.8,2.1),
+    geo:new THREEr.CylinderGeometry(0.4,0.5,0.5,6), ports:[
+    {id:"in",kind:"in",sig:"audio",label:"EARS",offset:V(0,0.5,0)},
+  ]});
+}
+buildModules();
+
+/* --------------------------------------------------------- PATCH EDGES */
+/* edge-list is the source of truth (supports fan-in / fan-out).
+   audio applied imperatively per-edge on add/remove — never rebuild-all. */
+const edges=[];  // {id,from:port,to:port,cable,panner,cvGain}
+let voiceCount=0;
+
+function compatible(from,to){
+  if(!from||!to||from===to) return false;
+  if(from.module===to.module) return false;      // no self-patch on one module (yet)
+  return from.kind==="out" && to.kind==="in";     // West Coast: any OUT → any IN
+}
+function edgeExists(from,to){ return edges.some(e=>e.from===from&&e.to===to); }
+
+function connectAudio(edge){
+  const from=edge.from, to=edge.to, c=A;
+  if(to.param){
+    // AudioParam target → per-edge depth gain (attenuverter). Audio-rate OK.
+    const g=c.createGain(); g.gain.value=to.cvDepth||1;
+    from.node.connect(g); g.connect(to.param);
+    edge.cvGain=g;
+  } else if(to.module.type==="out"){
+    // reaches the ears → HRTF panner created AT THE SOURCE module
+    const p=AudioEngine.makePanner();
+    from.node.connect(p); p.connect(to.node);
+    edge.panner=p; edge.panFollow=from.module; voiceCount++;
+    updatePannerPos(edge);
+  } else {
+    // node input (folder in, LPG in, LPG ping) — plain connect
+    from.node.connect(to.node);
+  }
+}
+function disconnectAudio(edge){
+  const from=edge.from,to=edge.to;
+  try{
+    if(edge.cvGain){ from.node.disconnect(edge.cvGain); edge.cvGain.disconnect(); }
+    else if(edge.panner){ from.node.disconnect(edge.panner); edge.panner.disconnect(); voiceCount--; }
+    else { from.node.disconnect(to.node); }
+  }catch(e){/* already detached */}
+}
+const _pp=new THREEr.Vector3();
+function updatePannerPos(edge){
+  if(!edge.panner) return;
+  edge.panFollow.group.getWorldPosition(_pp);
+  const t=A.currentTime;
+  if(edge.panner.positionX){
+    edge.panner.positionX.setTargetAtTime(_pp.x,t,0.02);
+    edge.panner.positionY.setTargetAtTime(_pp.y,t,0.02);
+    edge.panner.positionZ.setTargetAtTime(_pp.z,t,0.02);
+  } else edge.panner.setPosition(_pp.x,_pp.y,_pp.z);
+}
+
+/* cable geometry (glowing tube along a sagging curve) */
+const cableMat=()=>new THREEr.MeshStandardMaterial({
+  color:COL.cable,emissive:COL.cable,emissiveIntensity:1.1,roughness:0.5,
+  transparent:true,opacity:0.95});
+const cvCableMat=()=>new THREEr.MeshStandardMaterial({
+  color:COL.cv,emissive:COL.cv,emissiveIntensity:0.9,roughness:0.5,
+  transparent:true,opacity:0.9});
+const _a=new THREEr.Vector3(),_b=new THREEr.Vector3(),_mid=new THREEr.Vector3();
+function cableCurve(aPos,bPos){
+  _mid.addVectors(aPos,bPos).multiplyScalar(0.5);
+  const sag=Math.min(0.9, aPos.distanceTo(bPos)*0.22);
+  _mid.y-=sag;
+  return new THREEr.CatmullRomCurve3([aPos.clone(),_mid.clone(),bPos.clone()]);
+}
+function portWorld(port,out){ port.mesh.getWorldPosition(out); return out; }
+function buildCableMesh(edge){
+  portWorld(edge.from,_a); portWorld(edge.to,_b);
+  const geo=new THREEr.TubeGeometry(cableCurve(_a,_b),20,0.028,8,false);
+  const mesh=new THREEr.Mesh(geo, edge.from.sig==="cv"?cvCableMat():cableMat());
+  mesh.userData={edge}; scene.add(mesh); edge.cable=mesh;
+}
+function refreshCable(edge){
+  portWorld(edge.from,_a); portWorld(edge.to,_b);
+  edge.cable.geometry.dispose();
+  edge.cable.geometry=new THREEr.TubeGeometry(cableCurve(_a,_b),20,0.028,8,false);
+}
+
+function addEdge(from,to){
+  if(!compatible(from,to)||edgeExists(from,to)) return false;
+  const edge={id:from.id+"→"+to.id,from,to};
+  edges.push(edge);
+  connectAudio(edge); buildCableMesh(edge);
+  updateReadout(); refreshPortConnections(); return true;
+}
+function removeEdge(edge){
+  const i=edges.indexOf(edge); if(i<0) return;
+  edges.splice(i,1);
+  disconnectAudio(edge);
+  if(edge.cable){ edge.cable.geometry.dispose(); scene.remove(edge.cable); }
+  updateReadout(); refreshPortConnections();
+}
+function clearEdges(){ [...edges].forEach(removeEdge); }
+
+/* ---------------- MODULE INSPECTOR (parameter editing) ---------------- */
+/* Each module type declares a set of editable parameters. Only shown for
+   the currently-selected module. Every parameter here is *base value*, so
+   patched CV modulation still sums on top. */
+const INSPECTOR_SPEC={
+  osc:[
+    {id:"pitch",label:"Base pitch",min:20,max:800,step:0.5,fmt:v=>v.toFixed(1)+" Hz",
+      get:m=>m.audio.base, set:(m,v)=>{ m.audio.base=v;
+        m.audio.osc.frequency.setTargetAtTime(v,A.currentTime,0.02);
+        if(m.audio.sub) m.audio.sub.frequency.setTargetAtTime(v*0.5,A.currentTime,0.02);
+      }},
+    {id:"wave",label:"Waveshape",min:0,max:1,step:0.01,fmt:v=>Math.round(v*100)+"%",
+      get:m=>m.audio.wet.gain.value, set:(m,v)=>m.audio.wet.gain.setTargetAtTime(v,A.currentTime,0.02)},
+    {id:"raw",label:"Sine mix",min:0,max:1,step:0.01,fmt:v=>Math.round(v*100)+"%",
+      get:m=>m.audio.raw.gain.value, set:(m,v)=>m.audio.raw.gain.setTargetAtTime(v,A.currentTime,0.02)},
+    {id:"sub",label:"Sub oct",min:0,max:0.6,step:0.01,fmt:v=>Math.round(v*100/0.6)+"%",
+      when:m=>!!m.audio.subGain, get:m=>m.audio.subGain?.gain.value ?? 0,
+      set:(m,v)=>m.audio.subGain?.gain.setTargetAtTime(v,A.currentTime,0.02)},
+    {id:"lvl",label:"Level",min:0,max:1.2,step:0.01,fmt:v=>v.toFixed(2),
+      get:m=>m.audio.amp.gain.value, set:(m,v)=>m.audio.amp.gain.setTargetAtTime(v,A.currentTime,0.02)},
+  ],
+  lfo:[
+    {id:"rate",label:"Rate",min:0.05,max:24,step:0.05,fmt:v=>v.toFixed(2)+" Hz",
+      get:m=>m.audio.osc.frequency.value, set:(m,v)=>m.audio.osc.frequency.setTargetAtTime(v,A.currentTime,0.02)},
+    {id:"skew",label:"Rise/fall",min:0,max:1,step:0.01,fmt:v=>v<0.45?"attack":(v>0.55?"decay":"symmetric"),
+      get:m=>m.audio.skew, set:(m,v)=>{ m.audio.skew=v; m.audio.shaper.curve=makeSkewCurve(v); }},
+    {id:"depth",label:"Depth",min:0,max:2,step:0.01,fmt:v=>v.toFixed(2),
+      get:m=>m.audio.depth.gain.value, set:(m,v)=>m.audio.depth.gain.setTargetAtTime(v,A.currentTime,0.02)},
+  ],
+  fold:[
+    {id:"drive",label:"Base drive",min:0,max:1.2,step:0.01,fmt:v=>v.toFixed(2),
+      get:m=>m.audio.baseCS.offset.value, set:(m,v)=>m.audio.baseCS.offset.setTargetAtTime(v,A.currentTime,0.02)},
+    {id:"gain",label:"Output",min:0,max:2,step:0.01,fmt:v=>v.toFixed(2),
+      get:m=>m.audio.tap.gain.value, set:(m,v)=>m.audio.tap.gain.setTargetAtTime(v,A.currentTime,0.02)},
+  ],
+  ring:[
+    {id:"gain",label:"Output",min:0,max:3,step:0.01,fmt:v=>v.toFixed(2),
+      get:m=>m.audio.tap.gain.value, set:(m,v)=>m.audio.tap.gain.setTargetAtTime(v,A.currentTime,0.02)},
+  ],
+  lpg:[
+    {id:"decay",label:"Vactrol decay",min:0.05,max:3,step:0.01,fmt:v=>v.toFixed(2)+"s",
+      get:m=>m.audio.decay, set:(m,v)=>{ m.audio.decay=v; }},
+    {id:"res",label:"Resonance",min:0.4,max:14,step:0.1,fmt:v=>v.toFixed(1),
+      get:m=>m.audio.lpf.Q.value, set:(m,v)=>m.audio.lpf.Q.setTargetAtTime(v,A.currentTime,0.02)},
+    {id:"gain",label:"Output",min:0,max:2,step:0.01,fmt:v=>v.toFixed(2),
+      get:m=>m.audio.tap.gain.value, set:(m,v)=>m.audio.tap.gain.setTargetAtTime(v,A.currentTime,0.02)},
+  ],
+  sou:[
+    {id:"rate",label:"Step rate",min:0.1,max:20,step:0.05,fmt:v=>v.toFixed(2)+"/s",
+      get:m=>m.audio.rate, set:(m,v)=>{ m.audio.rate=v; }},
+    {id:"flux",label:"Flux smoothing",min:0.3,max:8,step:0.05,fmt:v=>v.toFixed(2)+" Hz",
+      get:m=>m.audio.fluxLp.frequency.value, set:(m,v)=>m.audio.fluxLp.frequency.setTargetAtTime(v,A.currentTime,0.02)},
+    {id:"depth",label:"Flux depth",min:0,max:30,step:0.1,fmt:v=>v.toFixed(1),
+      get:m=>m.audio.fluxTap.gain.value, set:(m,v)=>m.audio.fluxTap.gain.setTargetAtTime(v,A.currentTime,0.02)},
+    {id:"step",label:"Step depth",min:0,max:3,step:0.01,fmt:v=>v.toFixed(2),
+      get:m=>m.audio.stepTap.gain.value, set:(m,v)=>m.audio.stepTap.gain.setTargetAtTime(v,A.currentTime,0.02)},
+  ],
+  clock:[
+    {id:"bpm",label:"Tempo",min:20,max:280,step:1,fmt:v=>Math.round(v)+" bpm",
+      get:m=>m.audio.bpm, set:(m,v)=>{ m.audio.bpm=v; }},
+    {id:"div",label:"Division",min:0.125,max:2,step:0.125,fmt:v=>{
+      const d={0.125:"1/32",0.25:"1/16",0.5:"1/8",1:"1/4",2:"1/2"}; return d[v]||v.toFixed(3);
+    }, get:m=>m.audio.div, set:(m,v)=>{ m.audio.div=v; }},
+    {id:"pdepth",label:"Pitch depth",min:0,max:3,step:0.05,fmt:v=>v.toFixed(2),
+      get:m=>m.audio.pitchTap.gain.value, set:(m,v)=>m.audio.pitchTap.gain.setTargetAtTime(v,A.currentTime,0.02)},
+  ],
+  out:[],
+};
+let selectedModule=null;
+function openInspector(mod){
+  selectedModule=mod;
+  const spec=INSPECTOR_SPEC[mod.type]||[];
+  el("iName").textContent=mod.name;
+  el("iKind").textContent=({osc:"oscillator",lfo:"function generator",fold:"wavefolder",
+    ring:"ring modulator",lpg:"low-pass gate",sou:"source of uncertainty",clock:"pulse+sequencer",out:"output"})[mod.type];
+  const body=el("iBody"); body.innerHTML="";
+  for(const p of spec){
+    if(p.when && !p.when(mod)) continue;
+    const row=document.createElement("div"); row.className="row";
+    const lab=document.createElement("label");
+    const nm=document.createElement("span"); nm.textContent=p.label;
+    const val=document.createElement("b"); val.textContent=p.fmt(p.get(mod));
+    lab.appendChild(nm); lab.appendChild(val); row.appendChild(lab);
+    const inp=document.createElement("input");
+    inp.type="range"; inp.min=p.min; inp.max=p.max; inp.step=p.step; inp.value=p.get(mod);
+    inp.addEventListener("input",()=>{ const v=+inp.value; p.set(mod,v); val.textContent=p.fmt(v); });
+    row.appendChild(inp); body.appendChild(row);
+  }
+  el("inspector").classList.add("on");
+}
+function closeInspector(){ selectedModule=null; el("inspector").classList.remove("on"); }
+document.addEventListener("DOMContentLoaded",()=>{
+  const c=el("iClose"); if(c) c.addEventListener("click",closeInspector);
+});
+// also wire immediately since DOM is already parsed by the time this runs
+setTimeout(()=>{ const c=el("iClose"); if(c) c.addEventListener("click",closeInspector); },0);
+
+function defaultPatch(){
+  const P=(mid,pid)=>findPort(modules.find(m=>m.id===mid),pid);
+  // Main voice chain: OSC 1 (FM'd by OSC 2) → folder → LPG → ears
+  addEdge(P("oscB","out"), P("oscA","fm"));    // complex osc
+  addEdge(P("oscA","out"), P("fold","in"));    // → wavefolder
+  addEdge(P("fold","out"), P("lpg","in"));     // → LPG
+  addEdge(P("lpg","out"), P("out","in"));      // → ears
+  // Continuously open the LPG so the voice is always audible; it breathes with flux.
+  addEdge(P("sou","flux"), P("lpg","cv"));
+  // Non-periodic timbre movement — kept subtle
+  addEdge(P("sou","step"), P("oscB","fm"));    // stepped random → OSC 2 pitch shifts FM ratio
+  addEdge(P("lfo","out"),  P("fold","sym"));   // function gen breathes fold symmetry
+  // Ring mod, folder·2, sequencer OFF — patch them yourself for more layers.
+}
+
+/* --------------------------------------------------------- INTERACTION */
+const ray=new THREEr.Raycaster();
+const ndc=new THREEr.Vector2();
+let hoverPort=null, dragPort=null, dragCable=null;      // patching
+let dragModule=null, dragPlane=new THREEr.Plane(), dragOffset=new THREEr.Vector3();
+let looking=false, lastX=0,lastY=0;
+let downX=0,downY=0,downTime=0,moved=false;
+
+function setNDC(e){ ndc.x=(e.clientX/innerWidth)*2-1; ndc.y=-(e.clientY/innerHeight)*2+1; }
+function pick(list){ ray.setFromCamera(ndc,camera); return ray.intersectObjects(list,false); }
+
+canvas.addEventListener("pointerdown",e=>{
+  if(gateUp) return;
+  canvas.setPointerCapture(e.pointerId);
+  setNDC(e); downX=lastX=e.clientX; downY=lastY=e.clientY; downTime=performance.now(); moved=false;
+  const ph=pick(portMeshes);
+  if(ph.length){ const port=ph[0].object.userData.port;
+    if(port.kind==="out"){ startPatch(port); return; }
+  }
+  const bh=pick(bodyMeshes);
+  if(bh.length){ startModuleDrag(bh[0].object.userData.module,bh[0].point); return; }
+  looking=true; canvas.classList.remove("patching");
+},{passive:true});
+
+canvas.addEventListener("pointermove",e=>{
+  if(gateUp) return;
+  setNDC(e);
+  const dx=e.clientX-lastX, dy=e.clientY-lastY;
+  if(Math.abs(e.clientX-downX)+Math.abs(e.clientY-downY)>4) moved=true;
+  lastX=e.clientX; lastY=e.clientY;
+
+  if(dragPort){ updateDragCable(); highlightTarget(); return; }
+  if(dragModule){ moveDraggedModule(); return; }
+  if(looking){
+    if(CAM.mode==="drone"){
+      CAM.dyaw   -= dx*0.005;
+      CAM.dpitch = clamp(CAM.dpitch + dy*0.005, -0.05, 1.35);
+    } else {
+      yaw-=dx*0.0038; pitch=clamp(pitch-dy*0.0038,-1.35,1.35);
+    }
+    return;
+  }
+  // hover feedback (no drag)
+  const ph=pick(portMeshes);
+  const np=ph.length?ph[0].object.userData.port:null;
+  if(np!==hoverPort){
+    if(hoverPort) setPortState(hoverPort,"idle");
+    hoverPort=np;
+    if(np) setPortState(np,"hover");
+  }
+},{passive:true});
+
+canvas.addEventListener("pointerup",e=>{
+  if(gateUp) return;
+  setNDC(e);
+  if(dragPort){ finishPatch(); }
+  else if(dragModule){
+    dragModule.body.material.emissiveIntensity=0.32;
+    // treat as click if it barely moved AND was quick
+    if(!moved && performance.now()-downTime<220){ openInspector(dragModule); }
+    dragModule=null;
+  }
+  else if(looking && !moved){
+    // a click (not a drag) on a cable cuts it
+    const ch=pick(edges.map(x=>x.cable).filter(Boolean));
+    if(ch.length){ removeEdge(ch[0].object.userData.edge); toast("Cable cut"); }
+  }
+  looking=false;
+  try{canvas.releasePointerCapture(e.pointerId);}catch(_){}
+},{passive:true});
+
+/* ------------------- PORT STATE / VISUAL FEEDBACK -------------------
+   Every port has a visual state that's driven from a small state machine.
+   States:
+     idle          — resting, subtle breathing on outputs, dim on inputs
+     hover         — pointer is over it (no drag in progress)
+     compatible    — during a drag, this port is a valid destination
+     incompatible  — during a drag, this port is NOT a valid destination
+     target        — during a drag, cursor is locking on to this port
+     connected     — the port has ≥1 active edge (ring is shown)
+   The connected ring is independent of the other states (a connected port
+   still highlights as "compatible" during a drag if another edge is possible). */
+function _portParts(port){
+  const g=port.mesh;
+  return { core:g.userData.core, ring:g.userData.ring, guide:g.userData.guide,
+           base:g.userData.baseIntensity, col:g.userData.baseColor };
+}
+function setPortState(port, state){
+  port._state=state;
+  const p=_portParts(port);
+  const c=p.core.material;
+  switch(state){
+    case "idle":
+      c.emissiveIntensity=p.base;
+      c.color.setHex(p.col); c.emissive.setHex(p.col);
+      port.mesh.scale.setScalar(1);
+      p.guide.material.opacity=0;
+      break;
+    case "hover":
+      c.emissiveIntensity=1.7;
+      port.mesh.scale.setScalar(1.35);
+      p.guide.material.opacity=0;
+      break;
+    case "compatible":
+      c.emissiveIntensity=1.4;
+      c.color.setHex(p.col); c.emissive.setHex(p.col);
+      port.mesh.scale.setScalar(1.15);
+      p.guide.material.color.setHex(p.col);
+      p.guide.material.opacity=0.25;   // faint aura so it's visible from far away
+      break;
+    case "incompatible":
+      c.emissiveIntensity=0.12;
+      port.mesh.scale.setScalar(0.85);
+      p.guide.material.opacity=0;
+      break;
+    case "target":
+      c.emissiveIntensity=2.6;
+      c.color.setHex(0xffffff); c.emissive.setHex(0xffffff);
+      port.mesh.scale.setScalar(1.6);
+      p.guide.material.color.setHex(0xffffff);
+      p.guide.material.opacity=0.55;
+      break;
+    case "invalid_target":   // hovering an incompatible port during drag
+      c.emissiveIntensity=1.4;
+      c.color.setHex(0xff3b3b); c.emissive.setHex(0xff3b3b);
+      port.mesh.scale.setScalar(1.15);
+      p.guide.material.opacity=0;
+      break;
+  }
+}
+function setPortConnected(port, isConnected){
+  port.connected = isConnected ? (port.connected||0)+0 : 0;   // no-op numeric field
+  const p=_portParts(port);
+  p.ring.material.opacity = isConnected ? 0.85 : 0;
+  p.ring.material.color.setHex(p.col);
+}
+// legacy shim used by existing code paths
+function setPortGlow(port,on){ setPortState(port, on?"hover":(port.connected?"idle":"idle")); }
+
+/* Recompute .connected for every port. Cheap (O(edges + ports)); called on edge changes. */
+function refreshPortConnections(){
+  for(const m of modules) for(const port of m.ports){ port.connected=0; }
+  for(const e of edges){ e.from.connected++; e.to.connected++; }
+  for(const m of modules) for(const port of m.ports){
+    setPortConnected(port, port.connected>0);
+  }
+}
+/* ------------------- PATCH MODE (drag) — compatibility feedback ---------------
+   When the user starts pulling a cable from an OUT jack, we:
+     1. Mark every valid destination as "compatible" (glowing rim + guide aura)
+     2. Mark every invalid one as "incompatible" (dimmed way down)
+     3. Draw a faint dashed guide-line from the source to each valid destination
+   These lines fade out as the drag ends. Lock-on ("target" state) is applied
+   in highlightTarget when the cursor gets close to a valid destination. */
+const guideLines=[];
+const _gA=new THREEr.Vector3(), _gB=new THREEr.Vector3();
+
+function _dashedLine(from,to,col){
+  const geo=new THREEr.BufferGeometry();
+  const arr=new Float32Array([from.x,from.y,from.z, to.x,to.y,to.z]);
+  geo.setAttribute("position",new THREEr.BufferAttribute(arr,3));
+  const mat=new THREEr.LineDashedMaterial({color:col,dashSize:0.12,gapSize:0.14,
+    transparent:true,opacity:0.32,depthTest:false});
+  const line=new THREEr.Line(geo,mat);
+  line.computeLineDistances();
+  line.renderOrder=999;
+  scene.add(line);
+  return line;
+}
+function enterPatchMode(fromPort){
+  // classify every port
+  for(const m of modules) for(const p of m.ports){
+    if(p===fromPort){ setPortState(p,"hover"); continue; }
+    if(compatible(fromPort,p)){
+      setPortState(p,"compatible");
+      // draw guide line
+      portWorld(fromPort,_gA); portWorld(p,_gB);
+      const col = (fromPort.sig==='audio'&&p.sig==='audio') ? COL.audio :
+                  (fromPort.sig==='cv'||p.sig==='cv') ? COL.cv : 0xffffff;
+      guideLines.push({line:_dashedLine(_gA,_gB,col), port:p});
+    } else {
+      setPortState(p,"incompatible");
+    }
+  }
+}
+function exitPatchMode(){
+  for(const l of guideLines){
+    l.line.geometry.dispose(); l.line.material.dispose(); scene.remove(l.line);
+  }
+  guideLines.length=0;
+  for(const m of modules) for(const p of m.ports){ setPortState(p,"idle"); }
+}
+function updateGuideLines(){
+  // keep guide-line ends attached to their (possibly moving) source/targets
+  if(!dragPort) return;
+  portWorld(dragPort,_gA);
+  for(const l of guideLines){
+    portWorld(l.port,_gB);
+    const arr=l.line.geometry.attributes.position.array;
+    arr[0]=_gA.x; arr[1]=_gA.y; arr[2]=_gA.z;
+    arr[3]=_gB.x; arr[4]=_gB.y; arr[5]=_gB.z;
+    l.line.geometry.attributes.position.needsUpdate=true;
+    l.line.computeLineDistances();
+  }
+}
+
+function startPatch(port){
+  dragPort=port; canvas.classList.add("patching"); looking=false;
+  const mat=port.sig==="cv"?cvCableMat():cableMat(); mat.opacity=0.7;
+  dragCable=new THREEr.Mesh(new THREEr.BufferGeometry(),mat); scene.add(dragCable);
+  enterPatchMode(port);
+}
+const _dragEnd=new THREEr.Vector3(), _fromW=new THREEr.Vector3();
+function updateDragCable(){
+  portWorld(dragPort,_fromW);
+  ray.setFromCamera(ndc,camera);
+  // If lock-on is active, snap the cable to that port instead of the cursor plane
+  let end;
+  if(lockOnPort){
+    portWorld(lockOnPort, _dragEnd);
+    end=_dragEnd;
+  } else {
+    const dist=camera.position.distanceTo(_fromW);
+    ray.ray.at(clamp(dist,1.2,9),_dragEnd);
+    end=_dragEnd;
+  }
+  dragCable.geometry.dispose();
+  dragCable.geometry=new THREEr.TubeGeometry(cableCurve(_fromW,end),16,0.03,7,false);
+}
+
+/* Lock-on: while dragging, if the cursor is close (in screen space) to any compatible
+   port, snap to it. Radius is generous so it feels magnetic without being finicky. */
+let lockOnPort=null;
+const _tmpNDC=new THREEr.Vector3();
+function findLockOnCandidate(){
+  if(!dragPort) return null;
+  // 1. hard hit test first — always wins
+  const ph=pick(portMeshes);
+  if(ph.length){
+    const cand=ph[0].object.userData.port;
+    if(cand!==dragPort) return cand;
+  }
+  // 2. proximity in screen space
+  let best=null, bestD=0.09;   // ~9% of viewport
+  for(const l of guideLines){
+    portWorld(l.port,_tmpNDC);
+    _tmpNDC.project(camera);
+    const dx=_tmpNDC.x-ndc.x, dy=_tmpNDC.y-ndc.y;
+    const d=Math.hypot(dx,dy);
+    if(d<bestD){ bestD=d; best=l.port; }
+  }
+  return best;
+}
+function highlightTarget(){
+  const cand = findLockOnCandidate();
+  if(cand!==lockOnPort){
+    if(lockOnPort){
+      // revert prior target to compatible/incompatible
+      setPortState(lockOnPort, compatible(dragPort,lockOnPort)?"compatible":"incompatible");
+    }
+    lockOnPort=cand;
+    if(cand){
+      setPortState(cand, compatible(dragPort,cand)?"target":"invalid_target");
+      const ok=compatible(dragPort,cand);
+      dragCable.material.color.set(ok?0x3dffa0:0xff3b3b);
+      dragCable.material.emissive.set(ok?0x3dffa0:0xff3b3b);
+    } else {
+      dragCable.material.color.set(COL.cable);
+      dragCable.material.emissive.set(COL.cable);
+    }
+  }
+}
+function finishPatch(){
+  const target = lockOnPort;
+  scene.remove(dragCable); dragCable.geometry.dispose(); dragCable=null;
+  if(target && compatible(dragPort,target)){
+    if(addEdge(dragPort,target)) toast("Patched "+dragPort.label+" → "+target.label);
+    else toast("Already patched");
+  } else if(target){ toast("Incompatible ports"); }
+  exitPatchMode();
+  dragPort=null; hoverPort=null; lockOnPort=null; canvas.classList.remove("patching");
+  refreshPortConnections();
+}
+function startModuleDrag(mod,point){
+  dragModule=mod; looking=false;
+  mod.body.material.emissiveIntensity=0.7;
+  dragPlane.setFromNormalAndCoplanarPoint(new THREEr.Vector3(0,1,0), mod.group.position);
+  ray.setFromCamera(ndc,camera);
+  const hit=new THREEr.Vector3(); ray.ray.intersectPlane(dragPlane,hit);
+  if(hit) dragOffset.subVectors(mod.group.position,hit); else dragOffset.set(0,0,0);
+}
+const _hit=new THREEr.Vector3();
+function moveDraggedModule(){
+  ray.setFromCamera(ndc,camera);
+  if(ray.ray.intersectPlane(dragPlane,_hit)){
+    _hit.add(dragOffset);
+    const b=roomSize*0.5-0.3;
+    dragModule.group.position.set(clamp(_hit.x,-b,b),dragModule.group.position.y,clamp(_hit.z,-b,b));
+    dragModule.dirty=true;
+  }
+}
+
+/* ------------------------------------------------------------ CONTROLS */
+const keys={};
+addEventListener("keydown",e=>{
+  if(gateUp) return;
+  if(keys[e.code]) return;                        // ignore repeats
+  keys[e.code]=true;
+  if(e.code==="Space") e.preventDefault();
+  if(e.code==="Digit3") setCameraMode(CAM.mode==="walk"?"drone":"walk");
+  else if(e.code==="KeyO"){
+    // drop an orb in front of the camera
+    _camW.setFromMatrixPosition(camera.matrixWorld);
+    const fwd=new THREEr.Vector3(0,0,-1).applyQuaternion(camera.getWorldQuaternion(new THREEr.Quaternion()));
+    _camW.addScaledVector(fwd, 1.4);
+    spawnOrb(_camW.clone());
+    toast("Orb released");
+  }
+  else if(e.code==="KeyX"){ clearOrbs(); toast("Orbs cleared"); }
+});
+addEventListener("keyup",e=>{ keys[e.code]=false; });
+
+// wheel = zoom. In walk mode it nudges FOV; in drone it changes orbit distance.
+canvas.addEventListener("wheel",e=>{
+  if(gateUp) return;
+  e.preventDefault();
+  const s=Math.sign(e.deltaY);
+  if(CAM.mode==="drone"){
+    CAM.zoom=clamp(CAM.zoom + s*0.6, 1.2, 20);
+  } else {
+    camera.fov = clamp(camera.fov + s*2.5, 32, 92);
+    camera.updateProjectionMatrix();
+  }
+},{passive:false});
+
+let proximityOn=true, roomSize=10.0;
+const el=id=>document.getElementById(id);
+el("master").oninput=e=>{ const v=+e.target.value; AudioEngine.setMaster(v/100); el("vMaster").textContent=v+"%"; };
+el("wet").oninput=e=>{ const v=+e.target.value; AudioEngine.setWet(v/100); el("vWet").textContent=v+"%"; };
+el("room").oninput=e=>{ setRoomSize(+e.target.value/100); };
+el("proxBtn").onclick=e=>{ proximityOn=!proximityOn;
+  e.target.classList.toggle("on",proximityOn); e.target.textContent="Proximity: "+(proximityOn?"On":"Off"); };
+el("resetBtn").onclick=()=>{ clearEdges(); defaultPatch(); toast("Patch reset"); };
+
+function setRoomSize(t){
+  roomSize=lerp(4,22,t);
+  roomEdges.scale.set(roomSize,roomSize*0.62,roomSize);
+  roomEdges.position.y=roomSize*0.31;
+  AudioEngine.setRoom(t);
+  el("vRoom").textContent=roomSize.toFixed(1)+" m";
+  el("rRoom").textContent=roomSize.toFixed(1)+" m";
+  el("rBlend").textContent=Math.round(t*100)+"% hall";
+  // pull any orbs back inside the new bounds so shrinking doesn't trap them
+  if(typeof orbs!=="undefined"){
+    const h=roomSize*0.5-0.2, yh=roomSize*0.62-0.2;
+    for(const o of orbs){
+      o.mesh.position.x=clamp(o.mesh.position.x,-h,h);
+      o.mesh.position.z=clamp(o.mesh.position.z,-h,h);
+      o.mesh.position.y=clamp(o.mesh.position.y,0.2,yh);
+    }
+  }
+}
+
+let toastT;
+function toast(msg){ const t=el("toast"); t.textContent=msg; t.classList.add("show");
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),1400); }
+function updateReadout(){
+  el("rPatch").textContent=edges.length;
+  el("rVoice").textContent=voiceCount;
+}
+
+/* --------------------------------------------------- ORBS (perpetual motion) */
+/* Each orb is a physics-lite floater that:
+   - never settles: velocity is topped up by a Perlin-ish curl field
+   - bounces elastically off the room walls, floor, ceiling
+   - bounces off module bodies (adds proximity delight to the LPG strike)
+   - hitting the LPG body → pluck it (velocity = strike strength)
+   - hitting any module → briefly nudges its "orb influence" scalar
+   - its distance-to-camera drives the wavefolder symmetry (even harmonics)
+     so orbs make the timbre *breathe* even when you stand still */
+const orbs=[]; const MAX_ORBS=24;
+const _op=new THREEr.Vector3(), _delta=new THREEr.Vector3();
+
+function noiseField(p, t){
+  // cheap divergence-ish field: three offset sines. Not real curl, but it looks/feels alive.
+  const s=0.42, w=0.35;
+  const x=Math.sin(p.y*s + t*w) - Math.cos(p.z*s*1.3 + t*w*0.7);
+  const y=Math.sin(p.z*s*0.9 + t*w*1.1) - Math.cos(p.x*s*1.2 + t*w*0.8);
+  const z=Math.sin(p.x*s*1.1 + t*w*0.9) - Math.cos(p.y*s*0.8 + t*w*1.2);
+  return _delta.set(x,y*0.6,z);
+}
+function spawnOrb(pos){
+  if(orbs.length>=MAX_ORBS){ // recycle oldest
+    const old=orbs.shift(); scene.remove(old.mesh); old.mesh.geometry.dispose(); old.mesh.material.dispose();
+    if(old.trail){ scene.remove(old.trail); old.trail.geometry.dispose(); old.trail.material.dispose(); }
+  }
+  const hue=(orbs.length*37)%360;
+  const col=new THREEr.Color(`hsl(${hue},85%,62%)`);
+  const mesh=new THREEr.Mesh(
+    new THREEr.SphereGeometry(0.11,16,12),
+    new THREEr.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:1.4,roughness:0.35}));
+  mesh.position.copy(pos||new THREEr.Vector3(
+    (Math.random()-0.5)*2, 1.2+Math.random()*1.4, (Math.random()-0.5)*2));
+  scene.add(mesh);
+  // aura light so it actually illuminates its surroundings
+  const light=new THREEr.PointLight(col,0.8,3.5,2); mesh.add(light);
+  // ribbon trail — ring buffer, linearized each frame to avoid the wrap-chord
+  const TRAIL=32;
+  const tGeo=new THREEr.BufferGeometry();
+  const tPos=new Float32Array(TRAIL*3);        // display buffer (linear, oldest→newest)
+  const tRing=new Float32Array(TRAIL*3);       // ring buffer (writer)
+  tGeo.setAttribute("position",new THREEr.BufferAttribute(tPos,3));
+  const tMat=new THREEr.LineBasicMaterial({color:col,transparent:true,opacity:0.55});
+  const trail=new THREEr.Line(tGeo,tMat); scene.add(trail);
+  const orb={
+    mesh, light, trail, tPos, tRing, tHead:0, TRAIL, color:col,
+    v: new THREEr.Vector3((Math.random()-0.5)*1.4, (Math.random()-0.2)*0.8, (Math.random()-0.5)*1.4),
+    energy: 0.9 + Math.random()*0.3,     // per-orb personality
+    cooldown: 0,                         // debounce for LPG strikes
+    hueT: Math.random()*10,
+  };
+  // seed both buffers at spawn
+  for(let i=0;i<TRAIL;i++){
+    const j=i*3;
+    tPos[j]=tRing[j]=mesh.position.x;
+    tPos[j+1]=tRing[j+1]=mesh.position.y;
+    tPos[j+2]=tRing[j+2]=mesh.position.z;
+  }
+  orbs.push(orb);
+  el("rOrb").textContent=orbs.length;
+  return orb;
+}
+function clearOrbs(){
+  for(const o of orbs){
+    scene.remove(o.mesh); o.mesh.geometry.dispose(); o.mesh.material.dispose();
+    scene.remove(o.trail); o.trail.geometry.dispose(); o.trail.material.dispose();
+  }
+  orbs.length=0; el("rOrb").textContent=0;
+}
+
+// module bounding radius (for orb collision) — used from module geometries
+function moduleRadius(mod){ return 0.55; }   // uniform-ish; visuals are small polyhedra
+
+function stepOrbs(dt, tNow){
+  if(!orbs.length){ return {folderMod:0, symMod:0}; }
+  const half=roomSize*0.5-0.15;
+  const yMin=0.15, yMax=roomSize*0.62-0.15;
+  let folderInfluence=0, symInfluence=0;
+  const foldMod=modules.find(m=>m.id==="fold");
+  const foldPos=foldMod?foldMod.group.position:null;
+
+  for(const o of orbs){
+    // ---- perpetual drive: curl-ish force + gentle target energy ----
+    const f=noiseField(o.mesh.position, tNow*0.001);
+    o.v.addScaledVector(f, dt*1.6);
+    // energy top-up: nudge toward target speed so orbs never stall
+    const spd=o.v.length(), target=o.energy;
+    if(spd<0.3) o.v.multiplyScalar(1.03);
+    else if(spd<target*0.7) o.v.multiplyScalar(1.008);
+    else if(spd>target*1.6) o.v.multiplyScalar(0.985);
+    // slight repulsion from center-of-mass of other orbs so they don't clump
+    // (skipped for perf when many orbs; only tiny bias)
+    // integrate
+    o.mesh.position.addScaledVector(o.v, dt);
+
+    // ---- wall/floor/ceiling bounces (elastic + tiny energy bump) ----
+    const p=o.mesh.position, v=o.v;
+    if(p.x> half){ p.x= half; v.x=-Math.abs(v.x)*1.02; }
+    if(p.x<-half){ p.x=-half; v.x= Math.abs(v.x)*1.02; }
+    if(p.z> half){ p.z= half; v.z=-Math.abs(v.z)*1.02; }
+    if(p.z<-half){ p.z=-half; v.z= Math.abs(v.z)*1.02; }
+    if(p.y> yMax){ p.y= yMax; v.y=-Math.abs(v.y)*1.02; }
+    if(p.y< yMin){ p.y= yMin; v.y= Math.abs(v.y)*1.02; }
+
+    // ---- module collisions ----
+    for(const m of modules){
+      m.group.getWorldPosition(_op);
+      _delta.subVectors(p,_op);
+      const r=moduleRadius(m)+0.11;
+      const d2=_delta.lengthSq();
+      if(d2 < r*r && d2>1e-6){
+        const d=Math.sqrt(d2);
+        _delta.multiplyScalar(1/d);
+        // push orb to surface
+        p.copy(_op).addScaledVector(_delta,r);
+        // reflect velocity along collision normal (elastic)
+        const vn = v.dot(_delta);
+        v.addScaledVector(_delta, -2*vn); v.multiplyScalar(1.03);
+        // strike the low-pass gate on contact — velocity = strength
+        if(m.id==="lpg" && o.cooldown<=0){
+          strikeLPG(clamp(Math.abs(vn)*0.55+0.35, 0.4, 1.0));
+          o.cooldown=0.18;
+          m.body.material.emissiveIntensity=1.2;
+        }
+        // pop the visual on any hit
+        m.body.material.emissiveIntensity = Math.min(1.6, m.body.material.emissiveIntensity+0.6);
+      }
+    }
+    if(o.cooldown>0) o.cooldown-=dt;
+
+    // ---- audio influence: orb near wavefolder → symmetry drift + drive tickle ----
+    if(foldPos){
+      const df=p.distanceTo(foldPos);
+      const near=clamp((3.0-df)/(3.0-0.4),0,1);
+      folderInfluence += near*0.35;
+      // symmetry uses signed vertical offset so above/below folder shifts even/odd
+      symInfluence += near*(p.y-foldPos.y)*0.35;
+    }
+
+    // ---- trail update: write into ring, linearize into display buffer ----
+    o.tHead=(o.tHead+1)%o.TRAIL;
+    const wi=o.tHead*3;
+    o.tRing[wi]=p.x; o.tRing[wi+1]=p.y; o.tRing[wi+2]=p.z;
+    // linearize: oldest sample is at (head+1) mod N; walk N samples into tPos
+    for(let k=0;k<o.TRAIL;k++){
+      const src=((o.tHead+1+k)%o.TRAIL)*3;
+      const dst=k*3;
+      o.tPos[dst]=o.tRing[src]; o.tPos[dst+1]=o.tRing[src+1]; o.tPos[dst+2]=o.tRing[src+2];
+    }
+    o.trail.geometry.attributes.position.needsUpdate=true;
+
+    // hue shimmer
+    o.hueT+=dt*0.6;
+    const gl = 1.1+Math.sin(o.hueT*2.1)*0.4;
+    o.mesh.material.emissiveIntensity = gl;
+    o.light.intensity = 0.6+gl*0.4;
+  }
+  return {folderMod: clamp(folderInfluence,0,1), symMod: clamp(symInfluence,-0.7,0.7)};
+}
+
+/* --------------------------------------------------- PROXIMITY + FRAME */
+const _camW=new THREEr.Vector3(), _camQ=new THREEr.Quaternion(), _modW=new THREEr.Vector3();
+const _oA=new THREEr.Vector3(), _oB=new THREEr.Vector3();
+function applyProximity(mod){
+  if(!mod.prox||!mod.audio) return 0;
+  mod.group.getWorldPosition(_modW);
+  const d=_camW.distanceTo(_modW);
+  const norm=clamp((5.5-d)/(5.5-0.8),0,1);
+  mod.proxVal=norm;
+  if(!proximityOn) return norm;
+  const t=A.currentTime;
+  if(mod.prox.target==="drive" && mod.audio.baseCS){
+    // additive bias — 0 at far, up to +0.25 at close. drive.gain's own 0.55 is untouched.
+    mod.audio.baseCS.offset.setTargetAtTime(norm*0.25, t, 0.08);
+  } else if(mod.prox.target==="decay" && mod.audio.vca){
+    mod.audio.decay=0.12+norm*1.3;
+  }
+  return norm;
+}
+
+/* the signature spatial patch: distance between the two oscillators = FM index.
+   Bring OSC 2 (modulator) toward OSC 1 (carrier) → screaming through-zero-ish FM. */
+function updateComplexOsc(){
+  const fe=edges.find(e=>e.to.module.id==="oscA"&&e.to.pid==="fm");
+  if(!fe||!fe.cvGain) return 0;
+  const a=modules.find(m=>m.id==="oscA"), b=modules.find(m=>m.id==="oscB");
+  a.group.getWorldPosition(_oA); b.group.getWorldPosition(_oB);
+  const d=_oA.distanceTo(_oB);
+  const idx=clamp((5.0-d)/(5.0-0.9),0,1);       // 0.9m..5m apart → 1..0
+  fe.cvGain.gain.setTargetAtTime(15+idx*520, A.currentTime, 0.06); // Hz of deviation
+  return idx;
+}
+
+/* LPG strike (Space, proximity gesture, or VR controller select) */
+let lpgMod=null, spacePrev=false, strikeArmed=true;
+function strikeLPG(strength){
+  if(!lpgMod){ lpgMod=modules.find(m=>m.id==="lpg"); }
+  pluckLPG(lpgMod, strength==null?1:strength);
+}
+
+let last=performance.now(), fpsAcc=0, fpsN=0, fpsShown=0;
+const MOVE=3.4; const _euler=new THREEr.Euler(0,0,0,"XYZ");
+function frame(){
+  const now=performance.now(); let dt=(now-last)/1000; last=now; dt=Math.min(dt,0.05);
+
+  // ---------------- CAMERA & LOCOMOTION ----------------
+  if(!renderer.xr.isPresenting){
+    if(CAM.mode==="walk"){
+      _euler.x=pitch; camera.quaternion.setFromEuler(_euler);
+      player.rotation.y=yaw;
+      const spd=MOVE*dt; let mx=0,mz=0;
+      if(keys.KeyW||keys.ArrowUp)mz-=1; if(keys.KeyS||keys.ArrowDown)mz+=1;
+      if(keys.KeyA||keys.ArrowLeft)mx-=1; if(keys.KeyD||keys.ArrowRight)mx+=1;
+      if(mx||mz){ const len=Math.hypot(mx,mz);
+        const fx=Math.sin(yaw), fz=Math.cos(yaw);
+        player.position.x+= (mx/len)*Math.cos(yaw)*spd + (mz/len)*fx*spd;
+        player.position.z+= -(mx/len)*Math.sin(yaw)*spd + (mz/len)*fz*spd;
+        const b=roomSize*0.5-0.4;
+        player.position.x=clamp(player.position.x,-b,b);
+        player.position.z=clamp(player.position.z,-b,b);
+      }
+      if(keys.KeyQ) player.position.y=clamp(player.position.y-spd,0.4,roomSize*0.55);
+      if(keys.KeyE) player.position.y=clamp(player.position.y+spd,0.4,roomSize*0.55);
+    } else {
+      // DRONE: orbit-around-target. WASD glides the target through the room;
+      // mouse-drag orbits; wheel zooms. This is you-as-a-drone-with-headphones,
+      // so listener still tracks camera position → spatial audio still coherent.
+      const spd=MOVE*1.2*dt; let mx=0,mz=0,my=0;
+      if(keys.KeyW||keys.ArrowUp)mz-=1; if(keys.KeyS||keys.ArrowDown)mz+=1;
+      if(keys.KeyA||keys.ArrowLeft)mx-=1; if(keys.KeyD||keys.ArrowRight)mx+=1;
+      if(keys.KeyE) my+=1; if(keys.KeyQ) my-=1;
+      if(mx||mz){ const len=Math.hypot(mx,mz);
+        const fx=Math.sin(CAM.dyaw), fz=Math.cos(CAM.dyaw);
+        CAM.dtarget.x+= (mx/len)*Math.cos(CAM.dyaw)*spd + (mz/len)*fx*spd;
+        CAM.dtarget.z+= -(mx/len)*Math.sin(CAM.dyaw)*spd + (mz/len)*fz*spd;
+      }
+      CAM.dtarget.y += my*spd;
+      const b=roomSize*0.5-0.6;
+      CAM.dtarget.x=clamp(CAM.dtarget.x,-b,b);
+      CAM.dtarget.z=clamp(CAM.dtarget.z,-b,b);
+      CAM.dtarget.y=clamp(CAM.dtarget.y,0.4,roomSize*0.62-0.4);
+      // camera = target + spherical offset
+      const cy=Math.cos(CAM.dpitch), sy=Math.sin(CAM.dpitch);
+      const ox=Math.sin(CAM.dyaw)*cy*CAM.zoom;
+      const oy=sy*CAM.zoom;
+      const oz=Math.cos(CAM.dyaw)*cy*CAM.zoom;
+      player.position.set(CAM.dtarget.x+ox, CAM.dtarget.y+oy, CAM.dtarget.z+oz);
+      player.rotation.y=0;
+      camera.lookAt(CAM.dtarget);
+    }
+  }
+
+  // ---------------- ORB SIMULATION ----------------
+  const orbInf = stepOrbs(dt, now);
+
+  // ---- AUDIO SYNC (listener + panners + spatial modulation) ----
+  if(A){
+    camera.getWorldPosition(_camW); camera.getWorldQuaternion(_camQ);
+    AudioEngine.setListener(_camW,_camQ);
+    for(const e of edges){ if(e.panner && (e.panFollow.dirty)) updatePannerPos(e); }
+
+    let fold=0, lpgN=0;
+    for(const m of modules){ const n=applyProximity(m);
+      if(m.id==="fold")fold=n; if(m.id==="lpg")lpgN=n; }
+    const fmIdx=updateComplexOsc();
+
+    // Orb influence: adds to fold via baseCS (sums with CV, doesn't override it).
+    const foldMod=modules.find(m=>m.id==="fold");
+    if(foldMod && foldMod.audio){
+      const t=A.currentTime;
+      // The proximity write already set baseCS; add orb influence on top.
+      // Since proximity uses setTargetAtTime with tau=0.08s, its effect settles quickly;
+      // we bias upward by orb amount, capped so it can't run away.
+      const nudge = orbInf.folderMod*0.35;
+      if(nudge>0.02){
+        const cur=foldMod.audio.baseCS.offset.value;
+        foldMod.audio.baseCS.offset.setTargetAtTime(clamp(cur+nudge*0.4,0.1,1.1), t, 0.15);
+      }
+      foldMod.audio.offset.offset.setTargetAtTime(orbInf.symMod*0.5, t, 0.12);
+    }
+
+    // ---- SOURCE OF UNCERTAINTY tick (JS-driven, at frame rate) ----
+    const sou = modules.find(m=>m.id==="sou");
+    if(sou && sou.audio){
+      const a=sou.audio; a.phase += dt*a.rate;
+      if(a.phase>=1){
+        a.phase-=Math.floor(a.phase);
+        // new random step: instant, no ramp (S&H behavior)
+        const v = (Math.random()*2-1);
+        a.step.offset.setValueAtTime(v, A.currentTime);
+      }
+    }
+
+    // ---- CLOCK/SEQUENCER tick ----
+    const clk = modules.find(m=>m.id==="clock");
+    if(clk && clk.audio){
+      const a=clk.audio;
+      const secPerStep = 60/a.bpm * a.div;
+      a.phase += dt/secPerStep;
+      if(a.phase>=1){
+        a.phase-=Math.floor(a.phase);
+        a.stepIdx=(a.stepIdx+1)%a.scale.length;
+        const pv = a.scale[a.stepIdx];    // pitch offset in Hz (via CV depth)
+        a.pitch.offset.setValueAtTime(pv/120, A.currentTime);   // normalize to ~±1
+        // trigger pulse: short up-blip on TRIG so gate→ping works
+        const t=A.currentTime;
+        a.trig.offset.cancelScheduledValues(t);
+        a.trig.offset.setValueAtTime(1.0, t);
+        a.trig.offset.setTargetAtTime(0.0, t+0.005, 0.02);
+      }
+    }
+
+    // Space key edge-triggers a strike; walking into the gate also plays it
+    if(keys.Space && !spacePrev) strikeLPG(1);
+    spacePrev=!!keys.Space;
+    const gate=modules.find(m=>m.id==="lpg"); gate.group.getWorldPosition(_modW);
+    const gd=_camW.distanceTo(_modW);
+    if(gd<0.85 && strikeArmed && CAM.mode==="walk"){ strikeLPG(0.85); strikeArmed=false; }
+    else if(gd>1.3){ strikeArmed=true; }
+
+    el("rFM").textContent=Math.round(15+fmIdx*520)+" Hz"; el("barFM").style.width=(fmIdx*100)+"%";
+    el("rPB").textContent=(fold+orbInf.folderMod*0.5).toFixed(2); el("barPB").style.width=(clamp(fold+orbInf.folderMod*0.5,0,1)*100)+"%";
+    el("rPF").textContent=lpgN.toFixed(2); el("barPF").style.width=(lpgN*100)+"%";
+  }
+
+  // ---- VISUALS ----
+  const pulse=0.9+Math.sin(now*0.004)*0.35;
+  for(const e of edges){ if(e.cable) e.cable.material.emissiveIntensity=pulse; }
+  for(const m of modules){
+    m.group.children[0].rotation.y += dt*0.25;      // gentle spin on body
+    if(m.dirty){ // module moved → refresh its cables + panners once, then clear
+      for(const e of edges){ if(e.from.module===m||e.to.module===m) refreshCable(e); }
+      m.dirty=false;
+    }
+  }
+
+  // ---- PORT ANIMATION ----
+  // Every port breathes slowly at its resting state; compatible targets pulse a bit
+  // brighter during a drag; connection rings pulse when signal flows.
+  const tPulse = now*0.001;
+  for(const m of modules){
+    for(const p of m.ports){
+      const state = p._state || "idle";
+      const parts = _portParts(p);
+      const core = parts.core.material;
+      const guide = parts.guide.material;
+      const phase = p.pulsePhase;
+      // idle breathing on outputs only (inputs stay calm)
+      if(state==="idle"){
+        if(p.kind==="out"){
+          const b = parts.base + 0.15*(0.5+0.5*Math.sin(tPulse*1.6 + phase));
+          core.emissiveIntensity = b;
+        }
+      }
+      // compatible ports pulse a slow bright wave — "come here"
+      else if(state==="compatible"){
+        const b = 1.1 + 0.6*(0.5+0.5*Math.sin(tPulse*3.2 + phase));
+        core.emissiveIntensity = b;
+        guide.opacity = 0.15 + 0.25*(0.5+0.5*Math.sin(tPulse*3.2 + phase));
+      }
+      // lock-on target pulses fast and hot
+      else if(state==="target"){
+        const b = 2.2 + 0.6*(0.5+0.5*Math.sin(tPulse*8 + phase));
+        core.emissiveIntensity = b;
+        guide.opacity = 0.4 + 0.3*(0.5+0.5*Math.sin(tPulse*8 + phase));
+      }
+      // connection ring pulses along with edge activity (signal-flow indicator)
+      if(p.connected){
+        parts.ring.material.opacity = 0.55 + 0.35*(0.5+0.5*Math.sin(tPulse*2.6 + phase));
+      }
+    }
+  }
+  // keep guide lines attached to their (possibly moving) ports
+  if(dragPort) updateGuideLines();
+  key.position.x=Math.sin(now*0.0004)*5;
+
+  renderer.render(scene,camera);
+
+  fpsAcc+=dt; fpsN++;
+  if(fpsAcc>=0.5){ fpsShown=Math.round(fpsN/fpsAcc); fpsN=0; fpsAcc=0;
+    el("rFps").textContent=fpsShown+" fps"; }
+}
+renderer.setAnimationLoop(frame);
+
+addEventListener("resize",()=>{
+  camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+
+/* --------------------------------------------------------------- START */
+let gateUp=true;
+function start(){
+  A=AudioEngine.init(); AudioEngine.resume();
+  modules.forEach(wireModuleAudio);   // build nodes now that ctx exists
+  defaultPatch();
+  setRoomSize(0.34);
+  gateUp=false; el("gate").style.display="none";
+  setTimeout(()=>strikeLPG(1), 120);   // an opening pluck
+  toast("Headphones on · press Space to strike the gate");
+}
+el("enterBtn").onclick=start;
+
+/* WebXR entry (graceful) */
+(async function xrProbe(){
+  const btn=el("xrbtn"), note=el("gateNote");
+  if(!navigator.xr){ return; }
+  try{
+    const ok=await navigator.xr.isSessionSupported("immersive-vr");
+    if(!ok){ note.textContent="No VR device detected · desktop controls active"; return; }
+    btn.style.display="inline-block"; btn.textContent="Enter VR";
+    btn.onclick=async()=>{
+      if(gateUp) start();
+      try{
+        const session=await navigator.xr.requestSession("immersive-vr",{optionalFeatures:["local-floor"]});
+        await renderer.xr.setSession(session);
+        setupXRControllers();
+        toast("VR session active");
+      }catch(err){ toast("VR blocked in this frame — use desktop controls"); }
+    };
+  }catch(e){/* probe blocked (e.g. sandboxed iframe) → stay on desktop */}
+})();
+
+/* XR controllers: ray-select to patch (mirrors the mouse logic) */
+function setupXRControllers(){
+  for(let i=0;i<2;i++){
+    const ctrl=renderer.xr.getController(i);
+    const line=new THREEr.Line(
+      new THREEr.BufferGeometry().setFromPoints([new THREEr.Vector3(0,0,0),new THREEr.Vector3(0,0,-5)]),
+      new THREEr.LineBasicMaterial({color:0x35d0e6}));
+    ctrl.add(line); player.add(ctrl);
+    let sel=null;
+    const rc=new THREEr.Raycaster(), tmpM=new THREEr.Matrix4();
+    function castPorts(){ tmpM.identity().extractRotation(ctrl.matrixWorld);
+      rc.ray.origin.setFromMatrixPosition(ctrl.matrixWorld);
+      rc.ray.direction.set(0,0,-1).applyMatrix4(tmpM);
+      return rc.intersectObjects(portMeshes,false); }
+    ctrl.addEventListener("selectstart",()=>{ const h=castPorts();
+      if(h.length && h[0].object.userData.port.kind==="out") sel=h[0].object.userData.port; });
+    ctrl.addEventListener("selectend",()=>{ if(!sel) return; const h=castPorts();
+      if(h.length){ const t=h[0].object.userData.port; if(compatible(sel,t)) addEdge(sel,t); } sel=null; });
+  }
+}
+</script>
+</body>
+</html>
